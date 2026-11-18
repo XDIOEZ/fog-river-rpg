@@ -2,8 +2,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 require('../js/data.js');
+require('../js/vocabulary.js');
 require('../js/battle.js');
 require('../js/world.js');
+require('../js/art.js');
+require('../js/scenes.js');
 const R = globalThis.River;
 
 function act(g, action, value) {
@@ -46,9 +49,11 @@ function store() {
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
 }
 
-test('three routes open in order, tutors equip actual spells, and the final ferry returns to free play', () => {
+test('optional quests, tutors, and the final ferry still work after opening the world', () => {
   const g = R.newGame(317);
-  assert.equal(R.worldAction(g, 'town', 1), false);
+  assert.equal(g.unlocked, 2);
+  act(g, 'town', 1);
+  act(g, 'world');
   for (const [region, place] of R.regions.entries()) {
     roadQuest(g, region);
     assert.equal(R.worldAction(g, 'fight', 'boss'), false);
@@ -109,6 +114,84 @@ test('three routes open in order, tutors equip actual spells, and the final ferr
   assert.equal(g.room, 'temple');
   act(g, 'fight', 'trial');
   assert.equal(g.battle.enemies[0].hp, 40);
+});
+
+test('a new journey begins with one safe practice monster and ends on the open map', () => {
+  const g = R.newGame(19);
+  assert.equal(g.scene, 'world');
+  assert.equal(g.deck.length, 10);
+  assert.equal(R.beginTutorial(g).includes('日语卡牌'), true);
+  assert.equal(R.beginTutorial(g), false);
+  assert.equal(g.scene, 'battle');
+  assert.equal(g.battle.enemies.length, 1);
+  assert.equal(g.battle.enemies[0].maxHp, 4);
+  assert.equal(g.battle.training, true);
+  // Even a mistaken card cannot spawn more enemies or damage the learner.
+  hit(g, false);
+  assert.equal(g.hp, g.maxHp);
+  assert.equal(g.battle.enemies.length, 1);
+  for (let n = 0; g.scene === 'battle' && n < 20; n++) hit(g);
+  assert.equal(g.scene, 'world');
+  assert.equal(g.loot, null);
+  assert.equal(g.battle, null);
+  assert.ok(g.progress.every(p => !p.accepted));
+});
+
+test('unlocked wilderness offers search, wait, and leave without automatic combat', () => {
+  const g = R.newGame(43);
+  act(g, 'road', 2);
+  assert.deepEqual([g.scene, g.region, g.battle], ['road', 2, null]);
+  act(g, 'search');
+  assert.equal(g.scene, 'road');
+  assert.ok(['fight', 'empty'].includes(g.discovery.type));
+  assert.equal(g.battle, null);
+  g.hp = 7;
+  act(g, 'wait');
+  assert.equal(g.hp, 9);
+  assert.equal(g.discovery, null);
+  act(g, 'leave');
+  assert.equal(g.scene, 'world');
+  act(g, 'town', 0);
+  act(g, 'road', 1);
+  assert.equal(g.region, 1);
+});
+
+test('search reveals story encounters before the player chooses to fight', () => {
+  const g = R.newGame(68);
+  act(g, 'town', 0);
+  act(g, 'room', 'lodge');
+  act(g, 'accept');
+  act(g, 'back');
+  act(g, 'road');
+  act(g, 'search');
+  assert.deepEqual([g.scene, g.discovery.type, g.discovery.source], ['road', 'fight', 'road']);
+  encounter(g, g.discovery.source);
+  act(g, 'search');
+  assert.deepEqual([g.scene, g.discovery.type, g.discovery.source], ['road', 'fight', 'boss']);
+  encounter(g, 'boss');
+  act(g, 'search');
+  assert.equal(g.discovery.type, 'lamp');
+  act(g, 'room', 'lamp');
+  act(g, 'light');
+  assert.equal(g.progress[0].lit, true);
+});
+
+test('world and towns draw connected travel paths while wilderness shows three choices', () => {
+  const g = R.newGame(49), view = R.travelView;
+  const world = view.landmarks(g, { lastDoor: '' });
+  assert.match(world, /class="map-connections"/);
+  assert.equal((world.match(/data-act="road"/g) ?? []).length, 3);
+  assert.equal((world.match(/data-act="town"/g) ?? []).length, 6);
+  assert.doesNotMatch(world, /data-act="locked"/);
+  act(g, 'town', 2);
+  assert.match(view.landmarks(g, { lastDoor: '' }), /class="connection-line"/);
+  act(g, 'road', 2);
+  const road = view.walkView(g);
+  for (const action of ['search', 'wait', 'leave']) assert.match(road, new RegExp('data-act="' + action + '"'));
+  assert.doesNotMatch(road, /data-act="fight"/);
+  act(g, 'search');
+  assert.equal(g.scene, 'road');
+  assert.ok(view.walkView(g).includes('data-act="search"'));
 });
 
 test('refresh resumes the exact battle and pending spoils, with a single claim', () => {

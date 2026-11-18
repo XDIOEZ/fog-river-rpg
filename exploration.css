@@ -1,0 +1,11 @@
+/* Connected travel routes sit on top of the map art, behind the destinations. */
+.map-connections { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.map-connections path { fill:none; stroke-linejoin:round; stroke-linecap:round; vector-effect:non-scaling-stroke; }
+.connection-border { stroke:#f5e9c7; stroke-width:7; opacity:.9; }
+.connection-line { stroke:#496c53; stroke-width:3; stroke-dasharray:9 6; filter:drop-shadow(0 1px 1px #2a463a88); }
+.discovery-action { display:inline-flex; align-items:center; padding-right:13px; margin-right:4px; border-right:1px solid #b4a47c; }
+@media (max-width:620px) and (orientation:portrait) {
+  .connection-border { stroke-width:5; }
+  .connection-line { stroke-width:2.5; stroke-dasharray:6 4; }
+  .discovery-action { padding-right:7px; margin-right:0; }
+}

@@ -22,6 +22,38 @@ button:focus-visible, input:focus-visible { outline: 3px solid #bf8548; outline-
 button .icon { pointer-events:none; }
 .icon { display: inline-block; vertical-align: middle; flex-shrink: 0; }
 #game { position: relative; isolation: isolate; outline: none; font-size: 16px; background: #c4c7ab; user-select: none; }
+.hand-card[data-drag] { touch-action: pan-x; }
+.combat-spell[data-drag] { touch-action: none; }
+.folio-row[data-drag], .folio-spell[data-drag], .folio-strap[data-drag] { touch-action: pan-y; }
+.drag-origin { opacity: .34 !important; }
+.dragging-item .traveler-position { pointer-events: auto; }
+.dragging-item .drop-ready { outline: 2px dashed #9c784b; outline-offset: 2px; }
+.dragging-item .drop-hover { outline: 3px solid #d6a54f; outline-offset: 2px; filter: brightness(1.08); }
+.dragging-item [data-drop-zone].drop-ready { box-shadow: inset 0 0 0 2px #997c5569; }
+.dragging-item [data-drop-zone].drop-hover { box-shadow: inset 0 0 0 3px #b78a45; }
+.drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-3deg);
+  filter: drop-shadow(0 12px 12px #172b2473);
+  opacity: .95;
+  color: #354434;
+}
+.drag-ghost > * {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  transform: none !important;
+  pointer-events: none !important;
+}
+.drag-ghost > :is(.folio-row,.folio-spell) {
+  background: #f4e8ca;
+  border: 1px solid #a79468;
+  border-radius: 5px;
+  padding: 8px 11px;
+  box-shadow: 0 3px 7px #24392a55;
+}
 #game.large-type { font-size: 18px; }
 #plane, #painting, #landmarks, #layer, #effects { position: absolute; inset: 0; }
 #plane { z-index: 0; transform-origin: 50% 50%; }

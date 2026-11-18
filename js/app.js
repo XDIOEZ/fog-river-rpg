@@ -5,7 +5,7 @@
   const game=$("#game"), plane=$("#plane"), painting=$("#painting"), pins=$("#landmarks"), layer=$("#layer"), hud=$("#hud"), overlays=$("#overlays"), effects=$("#effects"), context=$("#context"), notice=$("#notice");
   let g=R.loadGame(), onTitle=true, artKey="", lastScene="", panelKey="", busy=false, timer=0;
   let panelOpener=null;
-  const ui={modal:null,stack:[],say:"",card:null,skill:null,enemy:null,reserve:null,equipped:null,spell:null,journalFilter:"all",page:0,lastDoor:""};
+  const ui={modal:null,stack:[],say:"",card:null,skill:null,enemy:null,reserve:null,equipped:null,spell:null,journalFilter:"all",shopLevel:0,page:0,lastDoor:""};
   const camera={x:0,y:0,z:1,drag:null};
   const optionsKey="fog-river.settings.v1";
   let options={sound:true,volume:45,large:false};
@@ -44,6 +44,11 @@
       osc.connect(gain).connect(audioContext.destination);osc.start(now);osc.stop(now+.25);
     });
   }
+  function speakWord(wordId) {
+    if (!options.sound || !options.volume) return;
+    if (R.cards[wordId]) R.pronunciation.play(wordId, options.volume / 100, () => tell("这张词卡暂无可用的日语语音。", 3200));
+  }
+  function speakCard(instanceId) { speakWord(g.collection[instanceId]); }
   function tell(message,duration=2300) {
     window.clearTimeout(timer);
     notice.textContent=message||"";
@@ -117,10 +122,10 @@
     effects.replaceChildren();
   }
   function openModal(which) {
-    if(!onTitle&&g.scene==="battle"&&["deck","spells","journal","shop"].includes(which)) return;
+    if(!onTitle&&g.scene==="battle"&&["deck","upgrades","spells","journal","shop"].includes(which)) return;
     if(ui.modal==="pause"&&["settings","help"].includes(which)) ui.stack.push("pause");
     else if(ui.modal!==which) ui.stack=[];
-    Object.assign(ui,{modal:which,reserve:null,equipped:null,spell:null,journalFilter:"all",page:0});
+    Object.assign(ui,{modal:which,reserve:null,equipped:null,spell:null,journalFilter:"all",shopLevel:0,page:0});
     context.replaceChildren();tell("");draw();
   }
   function closeModal() {
@@ -128,10 +133,12 @@
     context.replaceChildren();draw();
   }
   function newJourney(resume) {
-    if(!resume) g=R.newGame();
+    R.pronunciation.stop();
+    if(!resume) {g=R.newGame();R.beginTutorial(g);}
     else g=R.loadGame()||g;
     if(!g) return;
     onTitle=false;resetInteraction();ui.lastDoor="";
+    if(!resume) ui.modal="tutorial";
     sound("travel");draw();persist();
   }
   function animateTrip(pin,finish) {
@@ -149,21 +156,24 @@
     const message=R.worldAction(g,action,value);
     if(!message) {
       const why=action==="side"&&g.trip?.kind==="merchant"?"铜币不足，行商这张牌要八枚铜币。":
-        action==="road"&&g.trip?"先在当地城镇靠岸，再进入这段河路。":"现在无法进行这项操作。";
+        action==="deck"&&value?.add&&!value?.remove&&g.deck.length>=R.capacity(g)?"牌匣已满，拖到随身卡牌上可以交换。":
+        action==="deck"&&value?.remove&&!value?.add&&g.deck.length<=5?"至少需要五张符卡，拖到收藏牌上可以交换。":
+        action==="deck"&&value?.add?"同一个词最多带两张，试试换出同词符卡。":"现在无法进行这项操作。";
       tell(why);return;
     }
     if(oldRoom&&g.scene==="town") ui.lastDoor=oldRoom;
     else if(g.scene==="town"&&previous!=="town") ui.lastDoor="";
     if(action==="take"||action==="side"||previous!==g.scene) {ui.modal=null;ui.stack=[];}
     ui.card=null;ui.skill=null;ui.enemy=null;
-    ui.say=previous==="room"&&g.scene==="room"&&action!=="back"?message:"";
+    ui.say=previous==="room"&&g.scene==="room"&&!["back","upgrade"].includes(action)?message:"";
+    if(action==="upgrade") speakCard(value);
     persist();
     const nav=previous!==g.scene&&pin?.classList.contains("map-pin");
     animateTrip(nav?pin:null,()=>{
       draw();
-      const purchase=action==="buy"||action==="take"||action==="claim";
+      const purchase=action==="buy"||action==="take"||action==="claim"||action==="upgrade";
       sound(purchase||action==="light"?"reward":previous!==g.scene?"travel":"tap");
-      if(!ui.say&&(purchase||["accept","work","finish","side","deck","slot","revive"].includes(action))) tell(message);
+      if(!ui.say&&(purchase||["accept","work","finish","side","deck","slot","revive","wait"].includes(action))) tell(message);
       else tell("");
     });
   }
@@ -198,7 +208,7 @@
     const to=centerOf(fighter,.5,.58), head=centerOf(layer.querySelector(".combat-hero"),.48,.06);
     const event=action==="attack"?R.attack(g,first,second,third):R.cast(g,first,second);
     if(!event) {tell("请重新选择有效目标。");return;}
-    R.advanceBattle(g);
+    const resolution=R.advanceBattle(g);
     persist();
     ui.card=null;ui.skill=null;
     setBusy(true);
@@ -206,7 +216,8 @@
     sound(miss?"miss":hit?"hit":"skill");
     if(event.wordId) flying(R.cards[event.wordId].jp,from,miss?head:to,miss,300);
     if(hit) damageText("−"+event.damage,to);
-    if(miss) {
+    if(g.scene==="world"&&resolution) tell(resolution,5400);
+    else if(miss) {
       const firstMistake=g.battle?.tutorial&&g.battle.stats.wrong===1;
       tell(event.text+(firstMistake?" 指向旅人头顶的错卡可重看译义。":""),firstMistake?5200:3300);
     }
@@ -241,8 +252,10 @@
     },wait);
   }
   function pickCard(id) {
-    if(ui.skill&&R.skills[ui.skill].target==="card") return battleMove("cast",ui.skill,id);
-    ui.card=ui.card===id?null:id;ui.skill=null;sound("paper");draw();
+    if(ui.skill&&R.skills[ui.skill].target==="card") {speakCard(id);return battleMove("cast",ui.skill,id);}
+    ui.card=ui.card===id?null:id;ui.skill=null;sound("paper");
+    if(ui.card) speakCard(id);
+    draw();
   }
   function pickTag(enemyId,tagId) {
     if(ui.skill&&R.skills[ui.skill].target==="tag") return battleMove("cast",ui.skill,{enemyId,tagId});
@@ -265,10 +278,10 @@
       case "start": return newJourney(false);
       case "continue": return newJourney(true);
       case "to-title":
-        resetInteraction();onTitle=true;tell("");draw();return;
+        R.pronunciation.stop();resetInteraction();onTitle=true;tell("");draw();return;
       case "modal": return openModal(val);
       case "close": return closeModal();
-      case "sound": options.sound=!options.sound;saveOptions();if(options.sound)sound("skill");draw();return;
+      case "sound": options.sound=!options.sound;saveOptions();if(options.sound)sound("skill");else R.pronunciation.stop();draw();return;
       case "text-size": options.large=!options.large;saveOptions();draw();return;
       case "fullscreen": return fullscreen();
     }
@@ -285,25 +298,53 @@
       case "zoom-out": zoom(1/1.2);return;
       case "zoom-reset": centerMap();return;
       case "card": return pickCard(val);
+      case "buy": case "take": speakWord(val);return travel(action,val,element);
+      case "upgrade": return travel("upgrade",val,element);
       case "tag": return pickTag(element.dataset.enemy,val);
       case "spell": return pickSpell(val);
       case "fan-prev": case "fan-next": {
         const fan=layer.querySelector(".hand-fan");
         fan?.scrollBy({left:(action==="fan-prev"?-.7:.7)*fan.clientWidth,behavior:reduced()?"instant":"smooth"});return;
       }
-      case "cancel-selection": ui.card=null;ui.skill=null;draw();return;
-      case "reserve": case "equipped": ui[action]=ui[action]===val?null:val;draw();return;
+      case "cancel-selection": R.pronunciation.stop();ui.card=null;ui.skill=null;draw();return;
+      case "reserve": case "equipped":
+        ui[action]=ui[action]===val?null:val;
+        if(ui[action]) speakCard(val);
+        draw();return;
       case "skill-choice": ui.spell=val;draw();return;
       case "journal-filter": ui.journalFilter=val;ui.page=0;draw();return;
+      case "shop-level": ui.shopLevel=Number(val);ui.page=0;draw();return;
       case "page": ui.page=Number(val);draw();return;
       case "gear-apply": {
         const pair={add:ui.reserve,remove:ui.equipped};
         ui.reserve=null;ui.equipped=null;return travel("deck",pair);
       }
-      case "slot": return travel("slot",{index:Number(val),skill:ui.spell||null});
+      case "slot":
+        if(ui.spell===null) {
+          if(g.slots[Number(val)]) {ui.spell=g.slots[Number(val)];sound("paper");draw();}
+          return;
+        }
+        if(g.slots[Number(val)]===ui.spell) {ui.spell=null;draw();return;}
+        return travel("slot",{index:Number(val),skill:ui.spell||null});
       default: return travel(action,val,element);
     }
   }
+  R.installDragDrop(game,{
+    getGame:()=>g,
+    enabled:()=>!busy&&!onTitle,
+    execute:command=>{
+      if(command.action==="attack") {speakCard(command.card);return battleMove("attack",command.card,command.enemy,command.tag);}
+      if(command.action==="cast") {
+        if(typeof command.target==="string") speakCard(command.target);
+        return battleMove("cast",command.skill,command.target);
+      }
+      if(command.action==="deck"&&command.add) speakCard(command.add);
+      ui.reserve=null;ui.equipped=null;ui.spell=null;
+      if(command.action==="deck") return travel("deck",{add:command.add,remove:command.remove});
+      if(command.action==="deck-order") return travel("deck-order",{from:command.from,to:command.to});
+      if(command.action==="slot") return travel("slot",{index:command.index,skill:command.skill});
+    }
+  });
   game.addEventListener("click",event=>{
     const target=event.target.closest("button[data-act]");
     if(!target) {context.replaceChildren();return;}
@@ -312,7 +353,7 @@
   });
   game.addEventListener("input",event=>{
     if(!event.target.matches("[data-volume]")) return;
-    options.volume=Number(event.target.value);saveOptions();
+    options.volume=Number(event.target.value);saveOptions();R.pronunciation.setVolume(options.volume/100);
   });
   game.addEventListener("change",e=>{if(e.target.matches("[data-volume]")) sound("skill");});
   game.addEventListener("wheel",event=>{
@@ -326,7 +367,8 @@
   game.addEventListener("pointerdown",event=>{
     if(!mapScene()||ui.modal) return;
     const dragTouch=event.pointerType==="touch"&&event.isPrimary&&camera.z>1&&!event.target.closest("button,.route-sheet,#hud");
-    if(event.button!==1&&!dragTouch) return;
+    const dragMouse=event.pointerType==="mouse"&&event.button===0&&camera.z>1&&!event.target.closest("button,.route-sheet,#hud,.map-tools");
+    if(event.button!==1&&!dragTouch&&!dragMouse) return;
     event.preventDefault();
     if(camera.z===1) zoom(1.18,event.clientX,event.clientY);
     camera.drag={x:event.clientX,y:event.clientY,ox:camera.x,oy:camera.y};

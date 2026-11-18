@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 require('../js/data.js');
+require('../js/vocabulary.js');
 require('../js/battle.js');
 const R = globalThis.River;
 

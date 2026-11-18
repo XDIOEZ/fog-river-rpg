@@ -43,14 +43,16 @@
   ];
 
   function newGame(seed = Date.now()) {
-    return {
-      version: 1, rng: seed >>> 0, scene: 'world', room: null, region: 0, unlocked: 0,
+    const g = {
+      version: 1, rng: seed >>> 0, scene: 'world', room: null, region: 0, unlocked: regions.length - 1,
       progress: regions.map(() => ({ accepted: false, road: false, work: false, boss: false, lit: false, claimed: false })),
-      visited: ['0:world'], trip: null, checkpoint: null, endingSeen: false, tutorialSeen: false,
+      visited: ['0:world'], trip: null, discovery: null, checkpoint: null, endingSeen: false, tutorialSeen: false,
       level: 1, xp: 0, hp: 12, maxHp: 12, mp: 4, maxMp: 4, gold: 0,
       collection: {}, nextCard: 1, deck: [], learned: [], slots: [null, null, null, null], profile: {},
       battle: null, encounter: null, loot: null
     };
+    g.deck = R.starter.map(wordId => addCard(g, wordId));
+    return g;
   }
 
   function saveGame(g, storage) {
@@ -65,7 +67,14 @@
   function loadGame(storage) {
     try {
       const saved = JSON.parse((storage ?? globalThis.localStorage).getItem(saveKey));
-      return saved?.version === 1 ? saved : null;
+      if (saved?.version !== 1) return null;
+      // Older saves used story progression to lock the world and starter cards.
+      saved.unlocked = regions.length - 1;
+      saved.discovery ??= null;
+      if (!saved.deck.length && !Object.keys(saved.collection).length) {
+        saved.deck = R.starter.map(wordId => addCard(saved, wordId));
+      }
+      return saved;
     } catch {
       return null;
     }
@@ -74,6 +83,7 @@
   function visit(g, scene, room = null) {
     g.scene = scene;
     g.room = room;
+    g.discovery = null;
     const location = g.region + ':' + (room ?? scene);
     if (!g.visited.includes(location)) g.visited.push(location);
   }
@@ -117,9 +127,9 @@
 
   function takeRoad(g, value = g.region) {
     const region = Number(value);
-    if (!canTravel(g) || !canVisit(g, region) || !g.progress[region].accepted) return false;
-    // Changing river sections goes through a town. Opening the map keeps the current outing.
-    if (g.trip && g.trip.region !== region) return false;
+    if (!canTravel(g) || !canVisit(g, region)) return false;
+    // Keep an outing when returning to the same place, but allow free travel elsewhere.
+    if (g.trip?.region !== region) g.trip = null;
     g.region = region;
     if (!g.trip) {
       const kind = ['chest', 'merchant', 'spirit'][Math.floor(R.random(g) * 3)];
@@ -144,8 +154,7 @@
     if (!inside(g, 'lodge') || p.accepted) return false;
     p.accepted = true;
     if (g.region === 0) {
-      g.deck = R.starter.map(wordId => addCard(g, wordId));
-      return '卢卡斯递来一根干灯芯，又把装着十张符卡的旧牌匣塞进你手里。';
+      return '卢卡斯递来一根干灯芯，请你用随身的符卡帮忙重燃渡灯。';
     }
     return '接下委托「' + regions[g.region].quest + '」。';
   }
@@ -199,6 +208,27 @@
     return '牌匣已整理，带上 ' + next.length + ' 张符卡。';
   }
 
+  function beginTutorial(g) {
+    if (g.scene !== 'world' || g.tutorialSeen || g.battle) return false;
+    g.encounter = { source: 'tutorial', region: 0, kind: 'slime' };
+    g.scene = 'battle';
+    R.battleStart(g, 'slime', true);
+    g.battle.training = true;
+    // One tiny, non-splitting enemy: teach the card-to-weakness interaction only.
+    g.battle.enemies[0].hp = g.battle.enemies[0].maxHp = 4;
+    g.tutorialSeen = true;
+    return '先选日语卡牌，再点击敌人头顶意思相同的中文弱点。';
+  }
+
+  function reorderDeck(g, { from, to } = {}) {
+    if (!canGear(g) || from === to || !g.deck.includes(from) || !g.deck.includes(to)) return false;
+    const next = [...g.deck];
+    next.splice(next.indexOf(from), 1);
+    next.splice(next.indexOf(to), 0, from);
+    g.deck = next;
+    return '已调整符卡的携带顺序。';
+  }
+
   function beginFight(g, source) {
     const p = g.progress[g.region], place = regions[g.region];
     let kind;
@@ -218,6 +248,7 @@
     g.encounter = { source, region: g.region, kind };
     g.scene = 'battle';
     g.room = null;
+    g.discovery = null;
     R.battleStart(g, kind, first);
     return '遭遇' + R.enemies[kind].name;
   }
@@ -230,6 +261,12 @@
     }
     if (g.battle.status !== 'won') return false;
     const { region, source } = g.encounter;
+    if (source === 'tutorial') {
+      g.battle = g.encounter = g.loot = null;
+      g.hp = g.maxHp;
+      visit(g, 'world');
+      return '练习完成！三片河岸已经开放，选择任意地点自由探索。';
+    }
     const purse = 4 * (region + 1) * (source === 'boss' ? 2 : 1);
     g.loot = { source, choices: R.shuffle(g, R.pools[region]).slice(0, 3), gold: purse, xp: purse };
     g.scene = 'loot';
@@ -278,17 +315,57 @@
       g.gold -= shopPrice;
       addCard(g, g.trip.offer);
       g.trip.used = true;
+      g.discovery = null;
       return '从行商手中收下「' + R.cards[g.trip.offer].jp + '」。';
     }
     g.gold += 4;
     g.trip.used = true;
+    g.discovery = null;
     return '撬开漂来的货箱，找到 4 枚铜币。';
+  }
+
+  function search(g) {
+    if (g.scene !== 'road') return false;
+    const p = g.progress[g.region], place = regions[g.region];
+    let finding;
+    if (p.accepted && !p.road) {
+      finding = { type: 'fight', source: 'road', text: '草丛传来声响，发现了' + R.enemies[place.roadEnemy].name + '。要迎战吗？' };
+    } else if (p.accepted && place.work && !p.work) {
+      finding = { type: 'work', text: '找到任务线索：' + place.work + '。' };
+    } else if (p.accepted && !p.boss) {
+      finding = { type: 'fight', source: 'boss', text: '沿着足迹发现了' + R.enemies[place.bossEnemy].name + '。要迎战吗？' };
+    } else if (p.accepted && !p.lit) {
+      finding = { type: 'lamp', text: '你在雾中找到了' + place.lamp + '的入口。' };
+    } else if (p.road && g.trip && !g.trip.used) {
+      const text = { chest: '芦苇里发现一只漂来的货箱。', merchant: '河岸边发现一位兜售符卡的行商。', spirit: '浅滩上漂着一盏想与你切磋的纸灯。' };
+      finding = { type: 'side', text: text[g.trip.kind] };
+    } else if (R.random(g) < .55) {
+      finding = { type: 'fight', source: 'road', text: '发现了游荡的' + R.enemies[place.roadEnemy].name + '，可以选择是否迎战。' };
+    } else {
+      finding = { type: 'empty', text: '沿着河岸仔细搜索了一圈，没有发现危险。' };
+    }
+    g.discovery = finding;
+    return finding.text;
+  }
+
+  function wait(g) {
+    if (g.scene !== 'road') return false;
+    g.discovery = null;
+    const before = g.hp;
+    g.hp = Math.min(g.maxHp, g.hp + 2);
+    return '你在河边等待片刻，恢复了 ' + (g.hp - before) + ' 点生命。';
+  }
+
+  function leave(g) {
+    if (g.scene !== 'road') return false;
+    visit(g, 'world');
+    return '离开河岸，回到开放世界地图。';
   }
 
   const actions = {
     town: enterTown, room: openRoom, road: takeRoad, back: closeScene, accept: acceptQuest,
-    claim: claimQuest, learn, deck: changeDeck, slot: changeSlot, fight: beginFight,
-    take: takeLoot, revive, buy, side,
+    claim: claimQuest, learn, deck: changeDeck, 'deck-order': reorderDeck, upgrade: R.upgradeCard, slot: changeSlot, fight: beginFight,
+    take: takeLoot, revive, buy, side, search, wait, leave,
     world(g) {
       if (!canTravel(g)) return false;
       visit(g, 'world');
@@ -298,6 +375,7 @@
       const p = g.progress[g.region], place = regions[g.region];
       if (g.scene !== 'road' || !place.work || !p.road || p.work) return false;
       p.work = true;
+      g.discovery = null;
       return place.workText;
     },
     light(g) {
@@ -341,5 +419,5 @@
   function worldAction(g, action, value) {
     return Object.hasOwn(actions, action) ? actions[action](g, value) : false;
   }
-  Object.assign(R, { regions, newGame, saveGame, loadGame, saveKey, capacity, canGear, needXP, shopPrice, lessonsAt, worldAction, nextObjective, advanceBattle });
+  Object.assign(R, { regions, newGame, beginTutorial, saveGame, loadGame, saveKey, capacity, canGear, needXP, shopPrice, lessonsAt, worldAction, nextObjective, advanceBattle });
 })();

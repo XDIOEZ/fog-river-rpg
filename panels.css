@@ -88,8 +88,8 @@
 }
 .folio-close { margin-left: auto; width: 36px; height: 36px; display: grid; place-items: center; }
 .folio-close:hover { color: #895448; }
-.folio-tabs { display: flex; gap: 15px; flex-shrink: 0; padding: 0 26px; border-bottom: 1px solid #b09b7578; }
-.folio-tab { padding: 8px 5px 6px; border-bottom: 3px solid transparent; color: #685f4e; }
+.folio-tabs { display: flex; gap: 15px; flex-shrink: 0; overflow-x: auto; padding: 0 26px; border-bottom: 1px solid #b09b7578; }
+.folio-tab { flex: 0 0 auto; padding: 8px 5px 6px; border-bottom: 3px solid transparent; color: #685f4e; }
 .folio-tab.current { border-bottom-color: #506b58; color: #2e5144; font-weight: 700; }
 .folio-tab:hover, .folio-filter:hover { color: #365846; }
 .folio-spread {
@@ -154,6 +154,17 @@
   border-radius: 2px;
 }
 .folio-primary:not(:disabled):hover { background: #506952; }
+.folio-upgrade-summary { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+.folio-upgrade-summary span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.folio-upgrades { display: grid; gap: 8px; margin-bottom: 10px; }
+.folio-upgrade-card { padding: 9px 12px; border: 1px solid #a7906370; background: #fff9e547; }
+.folio-upgrade-top { display: flex; justify-content: space-between; font-size: 12px; color: #6b6958; }
+.folio-upgrade-path { display: flex; align-items: center; gap: 9px; margin-top: 5px; }
+.folio-upgrade-face { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.folio-upgrade-face b { overflow-wrap: anywhere; font-size: calc(var(--folio-base) + 2px); }
+.folio-upgrade-face small { color: #65634e; font-size: 12px; }
+.folio-upgrade-arrow { font-size: 21px; color: #6f876f; }
+.folio-upgrade-button { min-width: 113px; flex-shrink: 0; font-size: 13px; white-space: nowrap; }
 .folio-glyph { min-width: 32px; height: 32px; border-radius: 5px; }
 .folio-spell { min-height: 55px; }
 .folio-spell-name b { font-size: calc(var(--folio-base) + 1px); }
@@ -255,6 +266,9 @@
   .folio-head-mark { width: 33px; height: 33px; }
   .folio-tabs { padding: 0 13px; gap: 7px; }
   .folio-tab { font-size: var(--folio-base); }
+  .folio-upgrade-path { flex-wrap: wrap; gap: 5px; }
+  .folio-upgrade-face { flex-basis: 36%; }
+  .folio-upgrade-button { width: 100%; }
   .folio-spread > section { padding-right: 8px; }
   .folio-spread > section + section { padding-left: 8px; }
   .folio-spread h3 { font-size: 18px; flex-wrap: wrap; }

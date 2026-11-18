@@ -76,8 +76,8 @@
       const suffix = '（' + word.reading + '）';
       const face = word.jp.endsWith(suffix)
         ? '<ruby>' + word.jp.slice(0, -suffix.length) + '<rt>' + word.reading + '</rt></ruby>' : word.jp;
-      return `<button class="hand-card${word.jp.length > 6 ? ' long-word' : ''}" lang="ja" data-act="card" data-val="${id}"
-        title="${word.jp}${reading} · 伤害 ${word.level}" aria-label="${word.jp}，伤害 ${word.level}" aria-pressed="${id === selected}"
+      return `<button class="hand-card${word.jp.length > 6 ? ' long-word' : ''}" lang="ja" data-act="card" data-val="${id}" data-drag="hand"
+        title="${word.jp}${reading} · 伤害 ${word.level} · 可拖到怪物弱点" aria-label="${word.jp}，伤害 ${word.level}" aria-pressed="${id === selected}"
         style="--tilt:${angle}deg;--dip:${offset}px">
         <span class="paper-face playing-card"><span class="card-power" title="基础伤害 ${word.level}">${icon('sword', 13)}${word.level}</span>
           <b class="card-word">${face}</b><span class="copper-stamp">${icon('star', 16)}</span>
@@ -89,7 +89,6 @@
     return `<div class="fan-frame">
       <div class="hand-fan${scroll ? ' overflowing' : ''}${compactScroll ? ' compact-scroll' : ''}" data-round="${game.battle.round}" aria-label="当前手牌">${cards}</div>
       ${controls}
-      <div class="pile-tally">${icon('cards', 14)}<span>抽牌 ${game.battle.draw.length}</span><i></i><b>手牌 ${ids.length}</b><i></i><span>弃牌 ${game.battle.discard.length}</span></div>
     </div>`;
   }
 
@@ -99,13 +98,16 @@
       const skill = R.skills[id];
       const active = R.canCast(game, id);
       const message = game.mp < skill.cost ? '需 ' + skill.cost + ' 点法力，现有 ' + game.mp : skill.description;
-      return `<span class="spell-wrap"><button class="combat-spell" data-act="spell" data-val="${id}"
+      return `<span class="spell-wrap"><button class="combat-spell" data-act="spell" data-val="${id}" ${active ? 'data-drag="combat-spell"' : ''}
         aria-pressed="${selected === id}" aria-label="${skill.name}，${skill.cost} 点法力" ${active ? '' : 'disabled'}>
         ${icon(icons[id], 23)}<span>${skill.cost}</span></button>
         <span class="spell-tip" role="tooltip"><b>${skill.name} · ${skill.cost} 法力</b>${message}</span>
       </span>`;
     }).join('');
-    return `<div class="spell-belt"><div class="spell-slots">${slots}</div><span>法术</span></div>`;
+    return `<div class="spell-belt">
+      <div class="pile-tally">${icon('cards', 14)}<span>抽牌 ${game.battle.draw.length}</span><i></i><b>手牌 ${game.battle.hand.length}</b><i></i><span>弃牌 ${game.battle.discard.length}</span></div>
+      <div class="spell-slots">${slots}</div><span>法术</span>
+    </div>`;
   }
 
   function meter(name, label, value, max) {
@@ -120,7 +122,7 @@
     if (skill?.target === 'tag') prompt = skill.name + ' · 选择一枚弱点';
     else if (skill?.target === 'card') prompt = skill.name + ' · 选择一张手牌';
     else if (ui.card && battle.hand.includes(ui.card)) prompt = '「' + R.cards[game.collection[ui.card]].jp + '」 · 点选目标弱点';
-    else if (battle.tutorial && !battle.stats.correct && !battle.stats.wrong) prompt = '选一张符卡，再点怪物头顶的弱点';
+    else if (battle.tutorial && !battle.stats.correct && !battle.stats.wrong) prompt = '拖动符卡到怪物弱点，或先选牌再点击弱点';
 
     return `<section class="combat-view" aria-label="词卡战斗">
       <div class="combat-field">

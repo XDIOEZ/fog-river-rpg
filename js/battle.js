@@ -124,6 +124,7 @@
   };
 
   function plannedMove(battle, enemy) {
+    if (battle.training) return { type: 'wait', name: '等待你继续练习' };
     const moves = R.enemies[enemy.kind].moves;
     const move = moves[battle.queues[enemy.group] % moves.length];
     if (move.type === 'split') {

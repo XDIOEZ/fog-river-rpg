@@ -30,10 +30,10 @@
   }
   function titleView(saved) {
     return `<section class="title-menu" aria-label="主菜单">
-      <div class="title-kicker">日语词卡冒险</div>
+      <div class="title-kicker">开放世界 RPG · 日语词卡冒险</div>
       <div class="title-name"><h1>雾河的魔导书</h1></div>
       <div class="title-rule" aria-hidden="true">${icon("star",15)}</div>
-      <p class="title-story">白苇渡口的航灯熄灭了。<br>翻开魔导书，沿河点亮三座灯塔。</p>
+      <p class="title-story">先与一只小怪物练习战斗。<br>然后去你喜欢的河岸，自由写下冒险故事。</p>
       <nav class="title-actions" aria-label="旅程选项">
         <button class="start-btn" data-act="${saved?"continue":"start"}">${icon("sail",25)}${saved?"继续旅程":"新的旅程"}<kbd>Enter</kbd></button>
         <span class="title-aux">${saved?button("新的旅程","modal","restart","text-btn","quill"):""}${button("游玩指南","modal","help","text-btn","book")}${button("设置","modal","settings","text-btn","settings")}</span>
@@ -50,39 +50,38 @@
   function token(x,y) {
     return `<span class="traveler-token" aria-hidden="true" style="left:${x}%;top:${y}%">${icon("sail",15)}</span>`;
   }
-  const journeyRegion=g=>{const next=g.progress.findIndex((p,i)=>i<=g.unlocked&&!p.claimed);return next<0?g.region:next;};
+  function connections(edges) {
+    const lines=edges.map(([a,b])=>`M${a[0]} ${a[1]} L${b[0]} ${b[1]}`).join(" ");
+    return `<svg class="map-connections" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path class="connection-border" d="${lines}"/><path class="connection-line" d="${lines}"/></svg>`;
+  }
   function landmarks(g,ui) {
     const r=g.region, place=R.regions[r], p=g.progress[r];
     if(g.scene==="world") {
       let marks=R.regions.map((region,i)=>{
-        const locked=i>g.unlocked;
-        return pin(...townPoints[i],region.town,locked?"locked":"town",i,locked?"lock":"sail",locked?"locked":(journeyRegion(g)===i?"active":""))+
-          (g.progress[i].accepted&&!locked?pin(...roadPoints[i],region.road,"road",i,"trail","",true):"");
+        return pin(...townPoints[i],region.town,"town",i,"sail",r===i?"active":"")+
+          pin(...roadPoints[i],region.road,"road",i,"trail","",true);
       }).join("");
       const pos=g.trip?roadPoints[r]:townPoints[r];
-      const buildings=R.regions.map((region,i)=>spot(townPoints[i][0]-4,townPoints[i][1]-1,8,7,region.town,i>g.unlocked?"locked":"town",i)).join("");
-      return buildings+marks+token(pos[0],pos[1]+2);
+      const buildings=R.regions.map((region,i)=>spot(townPoints[i][0]-4,townPoints[i][1]-1,8,7,region.town,"town",i)).join("");
+      const edges=R.regions.flatMap((_,i)=>[[townPoints[i],roadPoints[i]],...(i<2?[[roadPoints[i],townPoints[i+1]]]:[])]);
+      return connections(edges)+buildings+marks+token(pos[0],pos[1]+2);
     }
     if(g.scene==="town") {
       const sites=doors[r];
       let buildings="",marks="";
       for(const [key,[x,y]] of Object.entries(sites)) {
-        const road=key==="road", act=road?(p.accepted?"road":"no-road"):"room", val=road?r:key;
-        const active=key==="lodge"&&(!p.accepted||p.lit&&!p.claimed)||key==="temple"&&r===0&&p.accepted&&!g.learned.includes("ward")||road&&p.accepted&&!p.lit;
+        const road=key==="road", act=road?"road":"room", val=road?r:key;
+        const active=key==="lodge"&&(!p.accepted||p.lit&&!p.claimed)||key==="temple"&&r===0&&p.accepted&&!g.learned.includes("ward");
         buildings+=spot(x-7,y-8,14,24,place[key],act,val);
         marks+=pin(x,y,place[key],act,val,{lodge:"house",temple:"shrine",witch:"leaf",road:"trail"}[key],active?"active":"");
       }
       const [x,y]=sites[ui.lastDoor]||[29,63];
-      return buildings+marks+token(x,y+9);
+      const edges=Object.entries(sites).filter(([key])=>key!=="lodge").map(([,point])=>[sites.lodge,point]);
+      return connections(edges)+buildings+marks+token(x,y+9);
     }
     if(g.scene==="road") {
-      const step=place.work&&p.road&&!p.work;
-      let marks=pin(27,67,place.road,"fight","road","sword",p.road?"":"active")+
-        pin(50,66,place.site,"side-info",undefined,p.road?"leaf":"lock",p.road?"":"locked");
-      if(step) marks+=pin(63,48,place.work,"work",undefined,"quill","active");
-      const open=p.road&&(!place.work||p.work);
-      return marks+pin(76,54,place.lamp,p.boss?"room":open?"fight":"no-lamp",p.boss?"lamp":"boss",open?"lantern":"lock",open&&!p.lit?"active":open?"":"locked")+
-        token(p.boss?73:p.road?41:19,p.boss?69:76);
+      return token(19,76);
     }
     if(g.scene==="room") {
       if(g.room==="lamp") return spot(52,19,23,46,place.lamp,p.lit?"rest":"light")+pin(64,55,p.lit?"渡灯":"放入灯芯",p.lit?"rest":"light",undefined,"lantern","active");
@@ -103,25 +102,27 @@
   }
   function walkView(g) {
     const r=g.region,place=R.regions[r],p=g.progress[r];
-    let title=place.quest,desc=R.nextObjective(g),action="",kicker="当前委托",symbol="quill";
+    let title=place.quest,desc=R.nextObjective(g),action="",kicker="可选委托",symbol="quill";
     if(g.scene==="world") {
-      const i=journeyRegion(g),target=R.regions[i];
-      kicker="河道图";title=target.name;symbol="compass";
-      desc=g.trip?"此趟河路仍留在图上，也可搭船返镇。":!g.progress[i].accepted?`进入${target.town}，到${target.lodge}找${target.keeper}。`:g.endingSeen?"沿三盏航灯自由往返。":`可在${target.town}整备，再去${target.road}。`;
-      action=g.trip?button("回到"+place.road,"road",r,"gold-btn","trail"):button("前往"+target.town,"town",i,"gold-btn","sail");
+      kicker="自由探索";title="雾河开放世界";symbol="compass";
+      desc="三片河岸都已开放。沿连线找到城镇与野外地点；任务可以慢慢接，不必按顺序闯关。";
+      action=button("前往"+place.town,"town",r,"gold-btn","sail");
     } else if(g.scene==="town") {
-      if(!p.accepted||p.lit&&!p.claimed) action=button("进入"+place.lodge,"room","lodge","gold-btn","house");
+      desc="可以在镇上拜访居民、学习法术，也可以直接出门探索。"+(p.accepted?" 当前委托："+R.nextObjective(g)+"。":" 船屋里有一份可选委托。 ");
+      if(!p.accepted||p.lit&&!p.claimed) action=button("进入"+place.lodge,"room","lodge","gold-btn","house")+button("去野外","road",r,"paper-btn","trail");
       else if(r===0&&!g.learned.includes("ward")) action=button("拜访"+place.mentor,"room","temple","gold-btn","shrine");
-      else if(p.claimed&&g.unlocked>r) action=button("展开河道图","world",undefined,"gold-btn","compass");
+      else if(p.claimed) action=button("展开河道图","world",undefined,"gold-btn","compass");
       else action=button("前往"+place.road,"road",r,"gold-btn","trail");
     } else {
-      kicker="河岸路标";symbol="trail";
-      if(!p.road) action=button("穿过"+place.road,"fight","road","gold-btn","sword");
-      else if(place.work&&!p.work) action=button(place.work,"work",undefined,"gold-btn","quill");
-      else if(!p.boss) action=button("挑战"+R.enemies[place.bossEnemy].name,"fight","boss","gold-btn","sword");
-      else if(!p.lit) action=button("走进"+place.lamp,"room","lamp","gold-btn","lantern");
-      else action=button("乘船返镇","town",r,"gold-btn","sail");
-      if(!p.lit) action=button("返回城镇","town",r,"text-btn","back")+action;
+      kicker="野外探索";title=place.road;symbol="trail";
+      desc=g.discovery?.text||"这里暂时没有怪物。搜索寻找事件，等待恢复生命，或者随时离开。";
+      const found=g.discovery;
+      const event=found?.type==="fight"?button("迎战","fight",found.source,"gold-btn","sword"):
+        found?.type==="work"?button(place.work,"work",undefined,"gold-btn","quill"):
+        found?.type==="lamp"?button("进入"+place.lamp,"room","lamp","gold-btn","lantern"):
+        found?.type==="side"?button("查看发现","side-info",undefined,"gold-btn","leaf"):"";
+      action=(event?`<span class="discovery-action">${event}</span>`:"")+button("搜索","search",undefined,"paper-btn","compass")+
+        button("等待","wait",undefined,"paper-btn","leaf")+button("离开","leave",undefined,"paper-btn","back");
     }
     return tools()+routeSheet(kicker,title,desc,action,symbol);
   }
@@ -165,7 +166,10 @@
     let title="",body="";
     if(which==="help") {
       title="旅人指南";
-      body=`<ul class="guide-list"><li><strong>启程</strong>　点河道图上的白苇镇，进入船屋向摆渡人领取符卡。</li><li><strong>出牌</strong>　先选日语手牌，再点怪物头顶意思相同的中文弱点。答对可以继续行动。</li><li><strong>失误</strong>　怪物执行一次预告动作。指向旅人头顶的错卡可复习，手牌用完才换回合。</li><li><strong>法术</strong>　向导师学艺，再点腰带上的护符消耗法力施法。</li><li><strong>操作</strong>　中键拖动地图，滚轮缩放，右键查看对象，Esc 收起浮窗或暂停。</li></ul>`;
+      body=`<ul class="guide-list"><li><strong>新旅程</strong>　先打一只不会主动攻击的练习史莱姆，然后自由探索三片河岸。</li><li><strong>探索</strong>　地图上用线连接可到达的地点。进入野外后可搜索、等待或离开；搜索发现敌人后可自行决定迎战。</li><li><strong>出牌</strong>　先选日语手牌，再点怪物头顶意思相同的中文弱点。答对可以继续行动。</li><li><strong>法术</strong>　向导师学艺，再点腰带上的护符消耗法力施法。</li><li><strong>操作</strong>　中键拖动地图，滚轮缩放，右键查看对象，Esc 收起浮窗或暂停。</li></ul>`;
+    } else if(which==="tutorial") {
+      title="一场小小的战斗练习";
+      body=`<p><strong>①</strong> 先点击屏幕下方的一张日语卡牌。</p><p><strong>②</strong> 找到怪物头顶意思相同的中文弱点，再点它就能攻击。</p><p><strong>③</strong> 打败这只练习史莱姆后，就可以去任何地方自由探索。</p><div class="scene-actions">${button("开始练习","close",undefined,"gold-btn","sword")}</div>`;
     } else if(which==="pause") {
       title="灯下小憩";
       body=`<p>${R.nextObjective(g)}。</p><div class="scene-actions">${button("继续旅程","close",undefined,"gold-btn","sail")}${button("设置","modal","settings")}${button("游玩指南","modal","help")}${button("回到标题","to-title")}</div>`;
