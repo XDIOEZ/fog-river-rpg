@@ -1,0 +1,160 @@
+(() => {
+  'use strict';
+  const R = globalThis.River;
+  const titles = {
+    deck: ['随身牌匣', 'cards'], spells: ['法术腰带', 'shield'], journal: ['旅途手札', 'quill'],
+    shop: ['船屋柜台', 'coin'], loot: ['战斗胜利', 'sail'], log: ['战斗记事', 'book']
+  };
+  const spellIcons = { ward: 'shield', insight: 'eye', redraw: 'redraw', burst: 'burst', pages: 'pages', foretell: 'book', chain: 'sword', reveal: 'star' };
+  const icon = (name, size = 20) => R.art.icon(name, size);
+  const escape = value => String(value).replace(/[&<>"']/g, mark => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[mark]);
+
+  function button(action, value, content, css = '', attributes = '') {
+    return '<button type="button" class="folio-button ' + css + '" data-act="' + action +
+      '" data-val="' + escape(value ?? '') + '" ' + attributes + '>' + content + '</button>';
+  }
+
+  function paging(page, total, size) {
+    const count = Math.max(1, Math.ceil(total / size));
+    const current = Math.min(Math.max(0, Number(page) || 0), count - 1);
+    return {
+      slice: values => values.slice(current * size, (current + 1) * size),
+      controls: count < 2 ? '' : '<nav class="folio-pages" aria-label="翻页">' +
+        button('page', current - 1, icon('back', 17), '', 'aria-label="上一页" ' + (current === 0 ? 'disabled' : '')) +
+        '<span>' + (current + 1) + ' / ' + count + '</span>' +
+        button('page', current + 1, icon('arrow', 17), '', 'aria-label="下一页" ' + (current + 1 === count ? 'disabled' : '')) + '</nav>'
+    };
+  }
+
+  function empty(name, text) {
+    return '<div class="folio-empty">' + icon(name, 35) + '<p>' + text + '</p></div>';
+  }
+
+  function wordRow(g, id, action, selected, writable) {
+    const word = R.cards[g.collection[id]];
+    const content = '<span class="folio-word"><b lang="ja">' + escape(word.jp) + '</b><small>' + escape(word.zh) + '</small></span>' +
+      '<span class="folio-damage" title="基础伤害">' + icon('sword', 16) + word.level + '</span>';
+    return button(action, id, content, 'folio-row' + (selected ? ' picked' : ''),
+      'aria-pressed="' + selected + '" ' + (writable ? '' : 'disabled'));
+  }
+
+  function deck(g, ui) {
+    const equipped = g.deck;
+    const reserve = Object.keys(g.collection).filter(id => !equipped.includes(id));
+    const add = reserve.includes(ui.reserve) ? ui.reserve : null;
+    const remove = equipped.includes(ui.equipped) ? ui.equipped : null;
+    const pages = paging(ui.page, Math.max(reserve.length, equipped.length), 6);
+    const writable = R.canGear(g), cap = R.capacity(g);
+    let reason = '';
+    if (!writable) reason = '在城镇或已点亮的航灯处可以整理牌匣。';
+    else if (!add && !remove) reason = '点左页选择带上的牌，或点右页选择收回的牌。';
+    else if (add && !remove && equipped.length >= cap) reason = '牌匣已满，再从右页选一张换出。';
+    else if (remove && !add && equipped.length <= 5) reason = '至少带五张符卡。可以从左页选一张替换。';
+    else if (add && equipped.filter(id => id !== remove && g.collection[id] === g.collection[add]).length >= 2) reason = '同一个词最多带两张。选一张同词的牌换出即可。';
+    const labels = [];
+    if (add) labels.push('带上「' + escape(R.cards[g.collection[add]].jp) + '」');
+    if (remove) labels.push('收回「' + escape(R.cards[g.collection[remove]].jp) + '」');
+    const left = pages.slice(reserve).map(id => wordRow(g, id, 'reserve', id === add, writable)).join('');
+    const right = pages.slice(equipped).map(id => wordRow(g, id, 'equipped', id === remove, writable)).join('');
+    return '<div class="folio-spread"><section><h3>收藏余牌 <small>' + reserve.length + ' 张</small></h3><div class="folio-rows">' +
+      (left || empty('cards', reserve.length ? '这一页没有余牌。' : equipped.length ? '现有的符卡都已带在身上。' : '先到船屋领取第一匣符卡。')) +
+      '</div></section><section><h3>随身携带 <small>' + equipped.length + ' / ' + cap + '</small></h3><div class="folio-rows">' +
+      (right || empty('bag', '这一页没有装备的符卡。')) + '</div></section></div>' +
+      '<footer class="folio-foot"><span class="folio-tip" role="status">' + (reason || labels.join('，')) + '</span>' + pages.controls +
+      button('gear-apply', null, add && remove ? '交换符卡' : remove ? '收回收藏' : '放入牌匣', 'folio-primary', reason ? 'disabled' : '') + '</footer>';
+  }
+
+  function spells(g, ui) {
+    const selected = ui.spell, writable = R.canGear(g);
+    const learned = g.learned.map(id => {
+      const skill = R.skills[id];
+      const content = '<span class="folio-glyph">' + icon(spellIcons[id]) + '</span><span class="folio-spell-name"><b>' + skill.name +
+        '</b><small>' + skill.description + '</small></span><span class="folio-cost" title="法力消耗">' + icon('mana', 15) + skill.cost + '</span>';
+      return button('skill-choice', id, content, 'folio-spell' + (selected === id ? ' picked' : ''), 'aria-pressed="' + (selected === id) + '" ' + (writable ? '' : 'disabled'));
+    }).join('');
+    const slots = g.slots.map((id, i) => {
+      const disabled = !writable || selected == null || id === selected || (!selected && !id) || (selected && !g.learned.includes(selected));
+      const mark = id ? icon(spellIcons[id], 28) : '<span class="folio-socket">◇</span>';
+      return button('slot', i, '<span class="folio-notch">' + (i + 1) + '</span>' + mark +
+        '<b>' + (id ? R.skills[id].name : '空槽') + '</b>', 'folio-strap', disabled ? 'disabled' : '');
+    }).join('');
+    return '<div class="folio-spread"><section><h3>已经学会 <small>' + g.learned.length + ' 种</small></h3><div class="folio-rows">' +
+      (learned || empty('shrine', '去' + R.regions[0].temple + '拜访' + R.regions[0].mentor + '，可以学到第一道护符。')) + '</div></section>' +
+      '<section><h3>装备位置 <small>' + g.slots.filter(Boolean).length + ' / 4</small></h3><div class="folio-belt">' + slots + '</div>' +
+      button('skill-choice', '', '取下护符', 'folio-unhang' + (selected === '' ? ' picked' : ''), writable && g.slots.some(Boolean) ? '' : 'disabled') +
+      '</section></div><footer class="folio-foot"><span class="folio-tip">' +
+      (!writable ? '在镇内或亮起的航灯处可以换装。' : selected === '' ? '点腰带上要取下的护符。' : selected ? '点一个位置，挂上「' + R.skills[selected].name + '」。' : '先选一道法术，再点腰带上的位置。') + '</span></footer>';
+  }
+
+  function journal(g, ui) {
+    const wrongOnly = ui.journalFilter === 'wrong';
+    const entries = Object.entries(g.profile).filter(([, entry]) => !wrongOnly || entry.wrong)
+      .sort((a, b) => a[1].firstRegion - b[1].firstRegion);
+    const pages = paging(ui.page, entries.length, 4);
+    const notes = pages.slice(entries).map(([id, entry]) => {
+      const word = R.cards[id], miss = entry.lastMiss;
+      const note = miss ? '<p class="folio-note">' + R.regions[miss.region].name + '第 ' + miss.round + ' 回合曾误点「' + escape(miss.target) + '」，这枚签可用「<span lang="ja">' +
+        escape(R.cards[miss.targetWordId].jp) + '</span>」。</p>' : '';
+      return '<article class="folio-entry"><small class="folio-place">' + icon('pin', 14) + R.regions[entry.firstRegion].name + '</small>' +
+        '<b lang="ja">' + escape(word.jp) + '</b><span class="folio-meaning">' + escape(word.zh) + '</span>' +
+        (word.reading !== word.jp ? '<small>读音 <span lang="ja">' + escape(word.reading) + '</span></small>' : '') +
+        '<small>命中 ' + entry.correct + ' 次 · 失手 ' + entry.wrong + ' 次</small>' + note + '</article>';
+    }).join('');
+    const filter = (id, label, active) => button('journal-filter', id, label, 'folio-filter' + (active ? ' picked' : ''), 'aria-pressed="' + active + '"');
+    return '<div class="folio-filterbar">' + filter('all', '全部词卡', !wrongOnly) + filter('wrong', '失误记录', wrongOnly) +
+      '<small>' + entries.length + ' 个词</small></div><div class="folio-notes">' +
+      (notes || empty('quill', wrongOnly ? '旅途中遇到的错词会记在这里。' : '收到第一张符卡，就能在这里读到它。')) +
+      '</div><footer class="folio-foot">' + pages.controls + '</footer>';
+  }
+
+  function shop(g, ui) {
+    const pool = R.pools[g.region], pages = paging(ui.page, pool.length, 6);
+    const enough = g.gold >= R.shopPrice;
+    const offers = pages.slice(pool).map(id => {
+      const word = R.cards[id];
+      const label = '购买「' + escape(word.jp) + '」';
+      return '<details class="folio-offer"><summary><span class="folio-offer-face"><span lang="ja">' + escape(word.jp) +
+        '</span><small>翻开价签</small></span><span class="folio-price">' + icon('coin', 17) + R.shopPrice + '</span></summary>' +
+        '<div class="folio-offer-back"><b>' + escape(word.zh) + '</b><small>' + R.wordKinds[word.kind] + ' · 基础伤害 ' + word.level + '</small>' +
+        button('buy', id, enough ? '买下词卡' : '铜币不足', 'folio-primary', 'aria-label="' + label + '" ' + (enough ? '' : 'disabled')) + '</div></details>';
+    }).join('');
+    return '<div class="folio-filterbar"><b>' + R.regions[g.region].lodge + '</b><span class="folio-wallet">' + icon('coin', 18) +
+      '持有 ' + g.gold + ' 枚</span></div><div class="folio-counter">' + offers + '</div><footer class="folio-foot">' + pages.controls + '</footer>';
+  }
+
+  function loot(g) {
+    if (!g.loot || !g.battle) return '';
+    const stats = g.battle.stats;
+    const cards = g.loot.choices.map(id => {
+      const word = R.cards[id];
+      return button('take', id, '<span class="folio-reward-top">' + R.wordKinds[word.kind] + '<small>' + icon('sword', 15) + word.level +
+        '</small></span><b lang="ja">' + escape(word.jp) + '</b><span class="folio-reward-meaning">' + escape(word.zh) +
+        '</span><span class="folio-stamp">' + icon('lantern', 23) + '</span>', 'folio-reward', 'aria-label="收下「' + escape(word.jp) + '」"');
+    }).join('');
+    return '<div class="folio-bounty"><div><span>' + icon('coin') + g.loot.gold + ' 枚铜币</span><span>' + icon('star') +
+      g.loot.xp + ' 点经验</span></div><small>第 ' + g.battle.round + ' 回合取胜 · 命中 ' + stats.correct +
+      ' 次 · 造成 ' + stats.damage + ' 点伤害</small></div><p class="folio-take-label">挑一张符卡带走</p><div class="folio-rewards">' + cards + '</div>';
+  }
+
+  function log(g, ui) {
+    const rows = [...(g.battle?.log ?? [])].reverse();
+    const pages = paging(ui.page, rows.length, 8);
+    return '<ol class="folio-log">' + pages.slice(rows).map(line => '<li>' + escape(line) + '</li>').join('') +
+      '</ol><footer class="folio-foot"><span class="folio-tip">最近的行动写在最上方。</span>' + pages.controls + '</footer>';
+  }
+
+  const draw = { deck, spells, journal, shop, loot, log };
+  R.panelView = function (g, ui) {
+    const key = ui.modal;
+    if (!Object.hasOwn(draw, key)) return '';
+    const [title, mark] = titles[key];
+    const tabs = ['deck', 'spells', 'journal'];
+    const nav = tabs.includes(key) ? '<nav class="folio-tabs" aria-label="随身物件">' + tabs.map(tab =>
+      button('modal', tab, titles[tab][0], 'folio-tab' + (key === tab ? ' current' : ''), key === tab ? 'aria-current="page"' : '')).join('') + '</nav>' : '';
+    return '<div class="folio-shade"><section class="folio folio-' + key + '" role="dialog" aria-modal="true" aria-labelledby="folio-title">' +
+      '<header class="folio-head"><span class="folio-head-mark">' + icon(mark, 24) + '</span><h2 id="folio-title">' +
+      (key === 'shop' && g.region ? '河港柜台' : title) + '</h2>' + (key === 'loot' ? '' :
+        button('close', null, icon('close'), 'folio-close', 'aria-label="合上" title="合上"')) + '</header>' +
+      nav + '<div class="folio-body">' + draw[key](g, ui) + '</div></section></div>';
+  };
+})();
