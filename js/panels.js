@@ -3,7 +3,7 @@
   const R = globalThis.River;
   const titles = {
     deck: ['随身牌匣', 'cards'], spells: ['法术腰带', 'shield'], journal: ['旅途手札', 'quill'],
-    upgrades: ['词卡进阶', 'star'], shop: ['船屋柜台', 'coin'], loot: ['战斗胜利', 'sail'], log: ['战斗记事', 'book']
+    upgrades: ['法师姐姐 · 词卡进阶', 'star'], shop: ['船屋柜台', 'coin'], loot: ['战斗胜利', 'sail'], log: ['战斗记事', 'book']
   };
   const spellIcons = { ward: 'shield', insight: 'eye', redraw: 'redraw', burst: 'burst', pages: 'pages', foretell: 'book', chain: 'sword', reveal: 'star' };
   const icon = (name, size = 20) => R.art.icon(name, size);
@@ -68,13 +68,13 @@
     const equipped = new Set(g.deck);
     const ids = Object.keys(g.collection).sort((a, b) => Number(equipped.has(b)) - Number(equipped.has(a)));
     const pages = paging(ui.page, ids.length, 5);
-    const writable = R.canGear(g);
+    const writable = R.canUpgrade(g);
     const cards = pages.slice(ids).map(id => {
       const info = R.upgradeInfo(g, id);
       if (!info) return '';
       const { current, next, rank, cost } = info;
       const canAfford = next && g.gold >= cost;
-      const label = !next ? '已经升满' : !writable ? '在城镇升级' : !canAfford ? '铜币不足' : '进阶 · ' + cost + ' 铜币';
+      const label = !next ? '已经升满' : !writable ? '请找法师姐姐' : !canAfford ? '铜币不足' : '进阶 · ' + cost + ' 铜币';
       const nextFace = next
         ? '<div class="folio-upgrade-face"><b lang="ja">' + escape(next.jp) + '</b><small>' + escape(next.zh) +
           ' · 伤害 ' + next.level + '</small></div>'
@@ -92,7 +92,7 @@
       ' 枚铜币</span><small>所有词卡都可进阶三次；升级后替换为相关的更难词语，伤害 +1</small></div>' +
       '<div class="folio-upgrades">' + (cards || empty('cards', '先获得词卡，就能在这里进阶。')) +
       '</div><footer class="folio-foot"><span class="folio-tip">' +
-      (writable ? '收藏牌和随身牌都能升级，不影响装备位置。' : '请前往城镇或已点亮的航灯处升级。') +
+      (writable ? '法师姐姐可以升级随身牌和收藏牌，不影响装备位置。' : '只有在符卡工坊找到法师姐姐才能升级。') +
       '</span>' + pages.controls + '</footer>';
   }
 
@@ -164,20 +164,25 @@
       '</div><footer class="folio-foot"><span class="folio-tip">词卡按难度从低到高排列</span>' + pages.controls + '</footer>';
   }
 
-  function loot(g) {
+  function loot(g, ui) {
     if (!g.loot || !g.battle) return '';
     const stats = g.battle.stats;
+    const selected = g.loot.choices.includes(ui.lootChoice) ? ui.lootChoice : null;
     const cards = g.loot.choices.map(id => {
       const word = R.cards[id];
-      return button('take', id, '<span class="card-power" title="基础伤害 ' + word.level + '">' + icon('sword', 13) + word.level +
+      return button('loot-preview', id, '<span class="card-power" title="基础伤害 ' + word.level + '">' + icon('sword', 13) + word.level +
         '</span><span class="folio-reward-kind">' + R.wordKinds[word.kind] + '</span><b class="card-word" lang="ja">' +
         escape(word.jp) + '</b><span class="folio-reward-meaning">' + escape(word.zh) +
-        '</span><span class="folio-stamp">' + icon('lantern', 23) + '</span>', 'folio-reward playing-card',
-        'aria-label="收下「' + escape(word.jp) + '」，基础伤害 ' + word.level + '"');
+        '</span><span class="folio-stamp">' + icon('lantern', 23) + '</span>', 'folio-reward playing-card' + (selected === id ? ' picked' : ''),
+        'aria-pressed="' + (selected === id) + '" aria-label="预览「' + escape(word.jp) + '」，基础伤害 ' + word.level + '"');
     }).join('');
+    const chosen = selected && R.cards[selected];
     return '<div class="folio-bounty"><div><span>' + icon('coin') + g.loot.gold + ' 枚铜币</span><span>' + icon('star') +
       g.loot.xp + ' 点经验</span></div><small>第 ' + g.battle.round + ' 回合取胜 · 命中 ' + stats.correct +
-      ' 次 · 造成 ' + stats.damage + ' 点伤害</small></div><p class="folio-take-label">挑一张符卡带走</p><div class="folio-rewards">' + cards + '</div>';
+      ' 次 · 造成 ' + stats.damage + ' 点伤害</small></div><p class="folio-take-label">单击词卡预览，确认后领取一张</p><div class="folio-rewards">' + cards + '</div>' +
+      '<footer class="folio-foot folio-reward-confirm"><span class="folio-tip" role="status" aria-live="polite">' +
+      (chosen ? '已选择「' + escape(chosen.jp) + '」 · 读音 ' + escape(chosen.reading) + ' · ' + escape(chosen.zh) : '请选择一张词卡，试听读音并确认。') + '</span>' +
+      (chosen ? button('take', selected, '确认领取', 'folio-primary', 'aria-label="确认领取「' + escape(chosen.jp) + '」"') : '') + '</footer>';
   }
 
   function log(g, ui) {
@@ -191,8 +196,9 @@
   R.panelView = function (g, ui) {
     const key = ui.modal;
     if (!Object.hasOwn(draw, key)) return '';
+    if (key === 'upgrades' && !R.canUpgrade(g)) return '';
     const [title, mark] = titles[key];
-    const tabs = ['deck', 'upgrades', 'spells', 'journal'];
+    const tabs = ['deck', 'spells', 'journal'];
     const nav = tabs.includes(key) ? '<nav class="folio-tabs" aria-label="随身物件">' + tabs.map(tab =>
       button('modal', tab, titles[tab][0], 'folio-tab' + (key === tab ? ' current' : ''), key === tab ? 'aria-current="page"' : '')).join('') + '</nav>' : '';
     return '<div class="folio-shade"><section class="folio folio-' + key + '" role="dialog" aria-modal="true" aria-labelledby="folio-title">' +

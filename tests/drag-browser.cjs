@@ -196,6 +196,58 @@ async function main() {
     assert.ok(await evaluate('document.querySelector(".hand-fan").scrollLeft > 0'),
       'Mouse dragging horizontally should scroll an overflowing hand');
     console.log('PASS: horizontal drag scrolls an overflowing hand');
+
+    assert.equal(await evaluate(`(() => {
+      const g = River.newGame(48);
+      g.scene='battle';River.battleStart(g,'slime');g.scene='loot';
+      g.loot={source:'road',choices:River.pools[0].slice(0,3),gold:4,xp:4};
+      return River.saveGame(g);
+    })()`), true);
+    await reload();
+    await click('[data-act="continue"]');
+    assert.equal(await evaluate('document.querySelectorAll("[data-act=loot-preview]").length'), 3);
+    assert.equal(await evaluate('Boolean(document.querySelector("[data-act=take]"))'), false);
+    const beforeReward = await saved();
+    await click('.folio-reward:nth-child(1)');
+    assert.equal(await evaluate('document.querySelector(".folio-reward.picked")?.dataset.val'), beforeReward.loot.choices[0]);
+    assert.deepEqual(await saved(), beforeReward, 'A preview must not award a card, gold or XP');
+    await click('.folio-reward:nth-child(2)');
+    assert.equal(await evaluate('document.querySelector("[data-act=take]")?.dataset.val'), beforeReward.loot.choices[1]);
+    assert.deepEqual(await saved(), beforeReward, 'Switching the preview must not award anything');
+    console.log('PASS: reward preview and switching do not claim');
+
+    await reload();
+    await click('[data-act="continue"]');
+    assert.equal(await evaluate('Boolean(document.querySelector("[data-act=take]"))'), false,
+      'Refreshing should not silently confirm a previous selection');
+    await click('.folio-reward:nth-child(2)');
+    await click('[data-act="take"]');
+    const rewarded = await saved();
+    assert.equal(rewarded.scene, 'road');
+    assert.equal(rewarded.gold, beforeReward.gold + 4);
+    assert.equal(rewarded.xp, beforeReward.xp + 4);
+    assert.equal(Object.keys(rewarded.collection).length, Object.keys(beforeReward.collection).length + 1);
+    assert.equal(rewarded.collection['c' + (rewarded.nextCard - 1)], beforeReward.loot.choices[1]);
+    assert.equal(await evaluate('Boolean(document.querySelector("[data-act=take]"))'), false);
+    console.log('PASS: explicit confirmation claims exactly one reward');
+
+    await send('Emulation.setDeviceMetricsOverride', { width: 360, height: 600, deviceScaleFactor: 1, mobile: true });
+    assert.equal(await evaluate(`(() => {
+      const g = River.newGame(49);
+      g.scene='battle';River.battleStart(g,'slime');g.scene='loot';
+      g.loot={source:'road',choices:River.pools[0].slice(0,3),gold:4,xp:4};
+      return River.saveGame(g);
+    })()`), true);
+    await reload();
+    await click('[data-act="continue"]');
+    await click('.folio-reward:nth-child(1)');
+    const confirmPosition = await evaluate(`(() => {
+      const r = document.querySelector('[data-act="take"]').getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, height: window.innerHeight };
+    })()`);
+    assert.ok(confirmPosition.top >= 0 && confirmPosition.bottom <= confirmPosition.height,
+      'Mobile claim button must remain on screen after preview: ' + JSON.stringify(confirmPosition));
+    console.log('PASS: mobile viewport keeps claim confirmation visible');
   } finally {
     socket?.close();
     browser.kill();

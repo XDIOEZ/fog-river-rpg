@@ -252,6 +252,8 @@
 .folio-reward:first-child { --tilt: -2deg; }
 .folio-reward:last-child { --tilt: 2deg; }
 .folio-reward:hover, .folio-reward:focus-visible { transform: translateY(-5px) rotate(0); box-shadow: 0 7px 12px #51482854; }
+.folio-reward.picked { transform: translateY(-5px) rotate(0); border: 2px solid #426c60; box-shadow: 0 0 0 3px #92aa8f, 0 7px 12px #51482854; }
+.folio-reward-confirm { margin-bottom: 8px; padding: 12px 4px 2px; }
 .folio-reward-kind { position: absolute; top: 13px; right: 9px; color: #726d55; font: 600 12px var(--body); }
 .folio-reward .card-word { font-size: clamp(13px, 15cqw, 27px); line-height: 1.14; }
 .folio-reward-meaning { font-size: var(--folio-base); color: #65634e; text-align: center; }

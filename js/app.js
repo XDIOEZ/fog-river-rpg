@@ -5,7 +5,7 @@
   const game=$("#game"), plane=$("#plane"), painting=$("#painting"), pins=$("#landmarks"), layer=$("#layer"), hud=$("#hud"), overlays=$("#overlays"), effects=$("#effects"), context=$("#context"), notice=$("#notice");
   let g=R.loadGame(), onTitle=true, artKey="", lastScene="", panelKey="", busy=false, timer=0;
   let panelOpener=null;
-  const ui={modal:null,stack:[],say:"",card:null,skill:null,enemy:null,reserve:null,equipped:null,spell:null,journalFilter:"all",shopLevel:0,page:0,lastDoor:""};
+  const ui={modal:null,stack:[],say:"",card:null,skill:null,enemy:null,reserve:null,equipped:null,spell:null,lootChoice:null,journalFilter:"all",shopLevel:0,page:0,lastDoor:""};
   const camera={x:0,y:0,z:1,drag:null};
   const optionsKey="fog-river.settings.v1";
   let options={sound:true,volume:45,large:false};
@@ -117,11 +117,12 @@
     panelKey=current;
   }
   function resetInteraction() {
-    Object.assign(ui,{modal:null,stack:[],card:null,skill:null,enemy:null,say:"",reserve:null,equipped:null,spell:null,page:0});
+    Object.assign(ui,{modal:null,stack:[],card:null,skill:null,enemy:null,say:"",reserve:null,equipped:null,spell:null,lootChoice:null,page:0});
     context.replaceChildren();
     effects.replaceChildren();
   }
   function openModal(which) {
+    if(which==="upgrades"&&(!g||!R.canUpgrade(g))) return tell("需要前往城镇的符卡工坊，请法师姐姐帮你升级词卡。");
     if(!onTitle&&g.scene==="battle"&&["deck","upgrades","spells","journal","shop"].includes(which)) return;
     if(ui.modal==="pause"&&["settings","help"].includes(which)) ui.stack.push("pause");
     else if(ui.modal!==which) ui.stack=[];
@@ -156,6 +157,7 @@
     const message=R.worldAction(g,action,value);
     if(!message) {
       const why=action==="side"&&g.trip?.kind==="merchant"?"铜币不足，行商这张牌要八枚铜币。":
+        action==="upgrade"?(!R.canUpgrade(g)?"要找符卡工坊的法师姐姐才能升级。":R.upgradeInfo(g,value)?.next?"升级铜币不足。":"这张卡牌已升满。"):
         action==="deck"&&value?.add&&!value?.remove&&g.deck.length>=R.capacity(g)?"牌匣已满，拖到随身卡牌上可以交换。":
         action==="deck"&&value?.remove&&!value?.add&&g.deck.length<=5?"至少需要五张符卡，拖到收藏牌上可以交换。":
         action==="deck"&&value?.add?"同一个词最多带两张，试试换出同词符卡。":"现在无法进行这项操作。";
@@ -163,7 +165,7 @@
     }
     if(oldRoom&&g.scene==="town") ui.lastDoor=oldRoom;
     else if(g.scene==="town"&&previous!=="town") ui.lastDoor="";
-    if(action==="take"||action==="side"||previous!==g.scene) {ui.modal=null;ui.stack=[];}
+    if(action==="take"||action==="side"||previous!==g.scene) {ui.modal=null;ui.stack=[];ui.lootChoice=null;}
     ui.card=null;ui.skill=null;ui.enemy=null;
     ui.say=previous==="room"&&g.scene==="room"&&!["back","upgrade"].includes(action)?message:"";
     if(action==="upgrade") speakCard(value);
@@ -298,7 +300,13 @@
       case "zoom-out": zoom(1/1.2);return;
       case "zoom-reset": centerMap();return;
       case "card": return pickCard(val);
-      case "buy": case "take": speakWord(val);return travel(action,val,element);
+      case "buy": speakWord(val);return travel(action,val,element);
+      case "loot-preview":
+        if(g.scene!=="loot"||!g.loot?.choices.includes(val)) return;
+        ui.lootChoice=val;speakWord(val);draw();return;
+      case "take":
+        if(g.scene!=="loot"||ui.lootChoice!==val||!g.loot?.choices.includes(val)) return;
+        return travel("take",val,element);
       case "upgrade": return travel("upgrade",val,element);
       case "tag": return pickTag(element.dataset.enemy,val);
       case "spell": return pickSpell(val);
