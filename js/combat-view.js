@@ -64,8 +64,8 @@
 
   function hand(game, selected) {
     const ids = game.battle.hand;
-    const scroll = ids.length > 8;
-    const compactScroll = ids.length > 5 ||
+    const scroll = ids.length > 5;
+    const compactScroll = ids.length >= 5 ||
       (ids.length > 3 && ids.some(id => R.cards[game.collection[id]].jp.length > 6));
     const cards = ids.map((id, i) => {
       const word = R.cards[game.collection[id]];
@@ -79,7 +79,7 @@
       return `<button class="hand-card${word.jp.length > 6 ? ' long-word' : ''}" lang="ja" data-act="card" data-val="${id}"
         title="${word.jp}${reading} · 伤害 ${word.level}" aria-label="${word.jp}，伤害 ${word.level}" aria-pressed="${id === selected}"
         style="--tilt:${angle}deg;--dip:${offset}px">
-        <span class="paper-face"><span class="card-power">${icon('sword', 13)}${word.level}</span>
+        <span class="paper-face playing-card"><span class="card-power" title="基础伤害 ${word.level}">${icon('sword', 13)}${word.level}</span>
           <b class="card-word">${face}</b><span class="copper-stamp">${icon('star', 16)}</span>
         </span>
       </button>`;
@@ -87,7 +87,7 @@
     const controls = compactScroll ? `<button class="fan-turn fan-left" data-act="fan-prev" aria-label="向左翻手牌">‹</button>
       <button class="fan-turn fan-right" data-act="fan-next" aria-label="向右翻手牌">›</button>` : '';
     return `<div class="fan-frame">
-      <div class="hand-fan${scroll ? ' overflowing' : ''}${ids.length > 5 ? ' dense' : ''}${compactScroll ? ' compact-scroll' : ''}" data-round="${game.battle.round}" aria-label="当前手牌">${cards}</div>
+      <div class="hand-fan${scroll ? ' overflowing' : ''}${compactScroll ? ' compact-scroll' : ''}" data-round="${game.battle.round}" aria-label="当前手牌">${cards}</div>
       ${controls}
       <div class="pile-tally">${icon('cards', 14)}<span>抽牌 ${game.battle.draw.length}</span><i></i><b>手牌 ${ids.length}</b><i></i><span>弃牌 ${game.battle.discard.length}</span></div>
     </div>`;

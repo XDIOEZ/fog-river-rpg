@@ -32,8 +32,8 @@
 
   function wordRow(g, id, action, selected, writable) {
     const word = R.cards[g.collection[id]];
-    const content = '<span class="folio-word"><b lang="ja">' + escape(word.jp) + '</b><small>' + escape(word.zh) + '</small></span>' +
-      '<span class="folio-damage" title="基础伤害">' + icon('sword', 16) + word.level + '</span>';
+    const content = '<span class="folio-damage" title="基础伤害">' + icon('sword', 16) + word.level + '</span>' +
+      '<span class="folio-word"><b lang="ja">' + escape(word.jp) + '</b><small>' + escape(word.zh) + '</small></span>';
     return button(action, id, content, 'folio-row' + (selected ? ' picked' : ''),
       'aria-pressed="' + selected + '" ' + (writable ? '' : 'disabled'));
   }
@@ -127,9 +127,11 @@
     const stats = g.battle.stats;
     const cards = g.loot.choices.map(id => {
       const word = R.cards[id];
-      return button('take', id, '<span class="folio-reward-top">' + R.wordKinds[word.kind] + '<small>' + icon('sword', 15) + word.level +
-        '</small></span><b lang="ja">' + escape(word.jp) + '</b><span class="folio-reward-meaning">' + escape(word.zh) +
-        '</span><span class="folio-stamp">' + icon('lantern', 23) + '</span>', 'folio-reward', 'aria-label="收下「' + escape(word.jp) + '」"');
+      return button('take', id, '<span class="card-power" title="基础伤害 ' + word.level + '">' + icon('sword', 13) + word.level +
+        '</span><span class="folio-reward-kind">' + R.wordKinds[word.kind] + '</span><b class="card-word" lang="ja">' +
+        escape(word.jp) + '</b><span class="folio-reward-meaning">' + escape(word.zh) +
+        '</span><span class="folio-stamp">' + icon('lantern', 23) + '</span>', 'folio-reward playing-card',
+        'aria-label="收下「' + escape(word.jp) + '」，基础伤害 ' + word.level + '"');
     }).join('');
     return '<div class="folio-bounty"><div><span>' + icon('coin') + g.loot.gold + ' 枚铜币</span><span>' + icon('star') +
       g.loot.xp + ' 点经验</span></div><small>第 ' + g.battle.round + ' 回合取胜 · 命中 ' + stats.correct +

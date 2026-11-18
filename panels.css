@@ -28,7 +28,6 @@
 }
 .folio *, .folio *::before, .folio *::after { box-sizing: border-box; }
 .large-type .folio { --folio-base: 18px; }
-.folio-reward-top small { font-size: inherit; }
 .folio::after {
   position: absolute;
   inset: 5px;
@@ -124,7 +123,7 @@
 .folio-word, .folio-spell-name { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 1px; }
 .folio-word b { font-size: calc(var(--folio-base) + 3px); font-weight: 600; overflow-wrap: anywhere; }
 .folio-word small, .folio-spell small { font-size: var(--folio-base); color: #596050; }
-.folio-damage, .folio-cost, .folio-price, .folio-wallet, .folio-place, .folio-bounty span, .folio-reward-top small {
+.folio-damage, .folio-cost, .folio-price, .folio-wallet, .folio-place, .folio-bounty span {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -183,6 +182,7 @@
 .folio-unhang, .folio-filter { padding: 5px 10px; color: #576052; border: 1px solid #9b8a68; border-radius: 2px; font-size: var(--folio-base); }
 .folio-unhang.picked, .folio-filter.picked { color: #f5ecd0; background: #526752; }
 .folio-filterbar { display: flex; align-items: center; gap: 8px; padding: 13px 0 10px; }
+.folio-levels { flex-wrap: wrap; padding-top: 0; }
 .folio-filterbar small, .folio-wallet { margin-left: auto; }
 .folio-wallet { font-size: var(--folio-base); color: #61573e; }
 .folio-notes, .folio-counter { display: grid; grid-template-columns: 1fr 1fr; gap: 0 25px; }
@@ -217,36 +217,34 @@
 .folio-bounty > div { display: flex; justify-content: center; gap: 25px; margin-bottom: 5px; color: #6c5938; font-size: 18px; }
 .folio-bounty small { font-size: var(--folio-base); }
 .folio .folio-take-label { margin: 5px 0 10px; text-align: center; font-size: calc(var(--folio-base) + 1px); }
-.folio-rewards { display: flex; align-items: stretch; justify-content: center; gap: 13px; padding: 2px 7px 17px; }
+.folio-rewards { display: flex; align-items: flex-start; justify-content: center; gap: 13px; padding: 2px 7px 17px; }
 .folio-reward {
   --tilt: 0deg;
+  position: relative;
   display: flex;
-  flex: 1;
+  flex: 0 1 178px;
+  width: 100%;
   min-width: 0;
+  min-height: 0;
   max-width: 178px;
-  min-height: 180px;
+  aspect-ratio: var(--playing-card-ratio);
+  container-type: inline-size;
+  overflow: hidden;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 12px 9px;
-  color: #35483b;
-  background: linear-gradient(145deg, #fcf1d6, #e6d4ac);
-  border: 1px solid #9c855b;
-  border-radius: 7px;
-  outline: 1px solid #b39a6b;
-  outline-offset: -5px;
+  gap: 8px;
+  padding: 48px 9px 44px;
   transform: rotate(var(--tilt));
-  box-shadow: 0 4px 8px #51482840;
   transition: transform .15s, box-shadow .15s;
 }
 .folio-reward:first-child { --tilt: -2deg; }
 .folio-reward:last-child { --tilt: 2deg; }
 .folio-reward:hover, .folio-reward:focus-visible { transform: translateY(-5px) rotate(0); box-shadow: 0 7px 12px #51482854; }
-.folio-reward-top { display: flex; width: 100%; align-items: center; justify-content: space-between; margin-bottom: auto; font-size: var(--folio-base); color: #6c654b; }
-.folio-reward b { font-size: clamp(18px, 2.1vw, 27px); overflow-wrap: anywhere; }
-.folio-reward-meaning { font-size: var(--folio-base); }
-.folio-stamp { width: 35px; height: 35px; margin-top: auto; }
+.folio-reward-kind { position: absolute; top: 13px; right: 9px; color: #726d55; font: 600 12px var(--body); }
+.folio-reward .card-word { font-size: clamp(13px, 15cqw, 27px); line-height: 1.14; }
+.folio-reward-meaning { font-size: var(--folio-base); color: #65634e; text-align: center; }
+.folio-stamp { position: absolute; bottom: 11px; left: 50%; transform: translateX(-50%); width: 29px; height: 29px; }
 .folio-body > .folio-log { list-style: none; margin: 6px 0 10px; padding: 0; }
 .folio-body > .folio-log li { padding: 8px 1px; border-bottom: 1px solid #a58e6752; }
 
@@ -263,7 +261,12 @@
   .folio-row { padding: 6px 3px; }
   .folio-word b { font-size: var(--folio-base); }
   .folio-rewards, .folio-belt { gap: 5px; }
-  .folio-reward { min-height: 150px; padding: 11px 6px; }
+  .folio-reward { padding: 39px 4px 29px; gap: 2px; }
+  .folio-reward .card-word { font-size: clamp(12px, 14cqw, 19px); }
+  .folio-reward-meaning { font-size: 13px; }
+  .folio-reward-kind { top: 10px; right: 6px; font-size: 10px; }
+  .folio-stamp { width: 22px; height: 22px; bottom: 7px; }
+  .folio-stamp .icon { width: 17px; height: 17px; }
   .folio-spell { flex-wrap: wrap; }
   .folio-spell-name { min-width: 80px; }
   .folio-notes, .folio-counter { gap: 0 12px; }
@@ -279,3 +282,40 @@
 @media (prefers-reduced-motion: reduce) {
   .folio-reward { transition: none; }
 }
+
+/* One physical card shape and one top-left damage marker in every card view. */
+.playing-card {
+  color: #354434;
+  background: linear-gradient(115deg, #ebdfbe, #f7ecd3 39%, #e8d9b5 90%);
+  border: 1px solid #988462;
+  border-radius: 9px;
+  box-shadow: 0 4px 9px #38433454, inset 0 0 0 3px #e9dcbc;
+}
+.playing-card::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid #a3916980;
+  border-radius: 5px;
+  pointer-events: none;
+}
+.playing-card .card-power {
+  position: absolute;
+  z-index: 1;
+  top: 8px;
+  left: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 31px;
+  min-height: 28px;
+  padding: 2px 5px;
+  color: #6c4d36;
+  background: #f3e6c6;
+  border: 1px solid #b29a70;
+  border-radius: 7px;
+  box-shadow: 0 1px 3px #554a3930;
+  font: 700 17px Georgia, var(--body);
+}
+.playing-card .card-power .icon { width: 13px; height: 13px; }

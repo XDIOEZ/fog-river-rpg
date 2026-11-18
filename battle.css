@@ -1,6 +1,6 @@
 .combat-view {
   --card-h: clamp(123px, 20vh, 196px);
-  --card-w: clamp(95px, 8.55vw, 157px);
+  --card-w: calc(var(--card-h) * 63 / 88);
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -92,25 +92,18 @@
 .hand-station, .fan-frame { position:relative; min-width:0; }
 .hand-prompt { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); padding:4px 12px; font:500 16px var(--serif); }
 .hand-fan { display:flex; align-items:end; justify-content:center; gap:4px; height:var(--card-h); }
-.hand-card { display:block; position:relative; flex:0 0 min(var(--card-w),18%); height:100%; min-width:0; margin:0; padding:0; border:0; border-radius:7px; background:transparent; transform:translateY(var(--dip)) rotate(var(--tilt)); transform-origin:50% 103%; transition:transform .14s ease-out; }
+.hand-card { display:block; position:relative; flex:0 1 var(--card-w); height:auto; aspect-ratio:var(--playing-card-ratio); min-width:0; margin:0; padding:0; border:0; background:transparent; transform:translateY(var(--dip)) rotate(var(--tilt)); transform-origin:50% 103%; transition:transform .14s ease-out; }
 .paper-face {
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:20px 6px 23px;
-  color:#354434; background:linear-gradient(115deg,#ebdfbe 0,#f4ead1 34%,#ede1c2 85%,#ddcba3);
-  border:1px solid #9a8965; border-radius:7px 5px 8px 4px; box-shadow:0 4px 8px #38433454, inset 0 0 0 3px #e9dcbc;
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:30px 7px 32px;
 }
-.paper-face::before { content:""; position:absolute; inset:4px; border:1px solid #a391694f; border-radius:3px; pointer-events:none; }
-.card-power { position:absolute; display:flex; align-items:center; gap:2px; top:8px; left:9px; color:#78684d; font:600 16px Georgia,var(--body); }
 .card-word { display:block; overflow-wrap:anywhere; max-height:100%; overflow:hidden; font:600 clamp(24px,2.3vw,39px)/1.18 "Yu Mincho","MS PMincho","Noto Serif CJK JP",var(--serif); }
 .card-word rt { font:500 .45em var(--body); }
 .long-word .card-word { font-size:clamp(24px,1.7vw,32px); line-height:1.07; }
 .copper-stamp { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); width:24px; height:24px; display:grid; place-items:center; border:1px solid #a78e65; outline:1px solid #bba477; outline-offset:-4px; border-radius:50%; color:#a48a60; }
 .hand-card:is(:hover,:focus-visible,[aria-pressed="true"]) { z-index:3; transform:translateY(-12px) rotate(0deg); }
 .hand-card[aria-pressed="true"] .paper-face { border-color:#71653f; box-shadow:0 0 0 2px #e1d19e,0 0 0 4px #907a4f,0 6px 11px #34453673; }
-.hand-fan.dense:not(.overflowing) { gap:2px; }
-.hand-fan.dense:not(.overflowing) .hand-card { flex:0 1 var(--card-w); }
-.hand-fan.dense .hand-card:is(:hover,:focus-visible,[aria-pressed="true"]) .paper-face { inset-inline:-6%; }
 .hand-fan.overflowing { justify-content:flex-start; align-items:end; overflow-x:auto; overflow-y:hidden; pointer-events:auto; scrollbar-width:thin; scrollbar-color:#9f906c #d2c7a5; height:calc(var(--card-h) + 17px); padding:17px 8px 0; }
-.hand-fan.overflowing .hand-card { flex-basis:var(--card-w); height:var(--card-h); margin-right:-5px; }
+.hand-fan.overflowing .hand-card { flex:0 0 var(--card-w); margin-right:-5px; }
 .fan-turn { display:none; position:absolute; z-index:4; top:45%; width:25px; height:37px; padding:0; border:1px solid #bdad83; background:#405545ed; color:#fff0c8; font:23px Georgia; }
 .hand-fan.overflowing ~ .fan-turn { display:block; }
 .fan-left { left:-6px; }
@@ -154,7 +147,7 @@
   .enemy-field:is([data-count="3"],[data-count="4"]) { inset-inline:36% 0; gap:2px 3%; }
 }
 @media (max-width:650px) {
-  .combat-view { --card-h:clamp(96px,16vh,132px); --card-w:clamp(89px,26vw,111px); }
+  .combat-view { --card-h:clamp(112px,17vh,146px); }
   .combat-field { inset:77px 4% 29%; }
   .traveler-position { left:-2%; bottom:0; width:32%; height:auto; aspect-ratio:2/3; }
   .wrong-pile { left:0; max-width:100%; transform:none; }
@@ -179,8 +172,7 @@
   .combat-log-button span { display:none; }
   .hand-prompt { max-width:100%; width:max-content; white-space:normal; text-align:center; overflow-wrap:anywhere; }
   .hand-fan.compact-scroll { justify-content:flex-start; height:calc(var(--card-h) + 17px); padding:17px 8px 0; overflow-x:auto; overflow-y:hidden; pointer-events:auto; scrollbar-width:thin; scrollbar-color:#9f906c #d2c7a5; }
-  .combat-view .hand-fan.compact-scroll .hand-card { flex:0 0 var(--card-w); height:var(--card-h); margin:0; transform:none; }
-  .hand-fan.compact-scroll .hand-card.long-word { flex-basis:137px; }
+  .combat-view .hand-fan.compact-scroll .hand-card { flex:0 0 var(--card-w); margin:0; transform:none; }
   .hand-fan.compact-scroll .hand-card:is(:hover,:focus-visible,[aria-pressed="true"]) { transform:translateY(-10px); }
   .hand-fan.compact-scroll ~ .fan-turn { display:block; }
   .card-word { font-size:24px; }

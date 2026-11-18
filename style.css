@@ -6,6 +6,7 @@
   --gold: #ad9365;
   --muted: #697264;
   --line: rgba(63, 76, 58, .32);
+  --playing-card-ratio: 63 / 88;
   --serif: Georgia,"STZhongsong","华文中宋","Songti SC","SimSun",serif;
   --body: "Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
   font-family: var(--body);
